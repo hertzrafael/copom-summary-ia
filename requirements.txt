@@ -3,3 +3,4 @@ groq
 streamlit
 requests
 beautifulsoup4
+pypdf
