@@ -10,7 +10,7 @@ class Extractor:
     def __init__(self):
         self.config = Config()
 
-    def init(self) -> str:
+    async def init(self) -> tuple[str, str]:
         print('Iniciando...')
         response = requests.get(self.config.url)
         content = response.json()
@@ -22,16 +22,21 @@ class Extractor:
         pdf_stream = io.BytesIO(file.content)
         reader = PdfReader(pdf_stream)
 
-        self.__save_title__(target['Titulo'])
+        title = target['Titulo']
+        pdf_content = self.__get_text_from_pdf__(reader)
+        self.__save__(title, pdf_content)
 
-        return self.__get_text_from_pdf__(reader)
+        return title, pdf_content
 
     def __get_text_from_pdf__(self, reader: PdfReader):
         return "\n\n".join(
             (page.extract_text() or "") for page in reader.pages
         )
 
-    def __save_title__(self, title):
+    def __save__(self, title, content):
 
-        with open('../data.txt', 'w', encoding='UTF-8') as file:
+        with open(f'{self.config.data_file_path}', 'w', encoding='UTF-8') as file:
             file.write(title)
+
+        with open(f'{self.config.last_content_path}', 'w', encoding='UTF-8') as file:
+            file.write(content)
