@@ -1,8 +1,6 @@
 from config.app_config import Config
-from pypdf import PdfReader
 
 import requests
-import io
 import re
 
 
@@ -23,30 +21,14 @@ class Extractor:
         title = target['Titulo']
         pdf_path = self.__save_pdf__(title, file.content)
 
-
-        #pdf_stream = io.BytesIO(file.content)
-        #reader = PdfReader(pdf_stream)
-
-        #title = target['Titulo']
-        #pdf_content = self.clean_text(self.__get_text_from_pdf__(reader))
-        #self.__save__(title, pdf_content)
-
         return title, pdf_path
 
-    def __get_text_from_pdf__(self, reader: PdfReader):
-        return "\n\n".join(
-            (page.extract_text() or "") for page in reader.pages
-        )
-
     def clean_text(self, text: str) -> str:
-        # Remove múltiplos espaços e linhas vazias repetidas
         text = re.sub(r'\n\s*\n+', '\n', text)
         text = re.sub(r' +', ' ', text)
 
-        # Remove cabeçalhos repetidos
         text = text.replace("bcb.gov.br", "")
 
-        # Remove numeração solta de página
         text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
 
         return text.strip()
@@ -60,13 +42,11 @@ class Extractor:
             f.write(pdf_bytes)
 
         print(f"[INFO] PDF salvo em: {output_path}")
+        self.__save__(safe_title)
 
         return output_path
 
-    def __save__(self, title, content):
+    def __save__(self, title):
 
         with open(f'{self.config.data_file_path}', 'w', encoding='UTF-8') as file:
             file.write(title)
-
-        #with open(f'{self.config.last_content_path}', 'w', encoding='UTF-8') as file:
-        #    file.write(content)

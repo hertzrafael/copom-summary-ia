@@ -1,4 +1,5 @@
 from agno.agent import Agent
+from agno.exceptions import ModelProviderError
 from agno.knowledge.embedder.huggingface import HuggingfaceCustomEmbedder
 from agno.knowledge.knowledge import Knowledge
 from agno.knowledge.reader.pdf_reader import PDFReader
@@ -7,14 +8,14 @@ from agno.models.groq import Groq
 from agno.db.sqlite import SqliteDb
 from dotenv import load_dotenv
 
+import streamlit as st
+
 load_dotenv()
 
 class UserAgent(Agent):
 
     def __init__(self):
         self.current = 0
-        self.GROQ_API_KEY = None
-        self.GEMINI_API_KEY = None
         self.available_models = [
             "openai/gpt-oss-120b",
             "openai/gpt-oss-20b",
@@ -34,28 +35,47 @@ class UserAgent(Agent):
                 Você é uma Inteligência Artifical para ajudar com relação às dúvidas sobre as últimas atas do COPOM. 
                 Seu principal objetivo é trazer a informação da ata com uma linguagem que até mesmo quem não entende do
                 assunto consiga entender, assim como trazer os impactos dos resultados da ata irá trazer na vida do
-                cidadão comum.
+                cidadão comum. Suas respostas devem possuir no máximo 400 caracteres, então seja objetivo!
             """
         )
 
         self.create_knowledge()
-        self.switch_model()
+        self.switch_model(force_change=False)
 
-    def switch_model(self):
-        self.current = 0 if self.current + 1 >= len(self.available_models) else self.current + 1
+    def switch_model(self, force_change=True):
 
-        self.model_id = self.available_models[self.current]
-        self.model = Groq(id=self.model_id, api_key=self.GROQ_API_KEY, temperature=0.2)
+        if 'model' in st.session_state and not force_change:
+            self.model_id = st.session_state.model
+            print(f'[INFO] O modelo {self.model_id} mantém sendo usado.')
+        else:
+            self.current = 0 if self.current + 1 >= len(self.available_models) else self.current + 1
+            self.model_id = self.available_models[self.current]
+            print(f'[INFO] O modelo foi trocado para {self.model_id}')
 
-        print(f'[INFO] O modelo foi trocado para {self.model_id}')
+
+        if 'groq_key' not in st.session_state:
+            print('Você precisa inserir uma chave do Groq.')
+            return
+
+        groq_key = st.session_state.get('groq_key')
+
+        print(f'usando modelo {self.model_id} com a key {groq_key}')
+        self.model = Groq(id=self.model_id, api_key=groq_key, temperature=0.2)
+        st.session_state.model = self.model_id
+
 
     def create_knowledge(self):
+
+        if 'hugging_face_key' not in st.session_state:
+            print('Você precisa inserir uma chave do Hugging Face.')
+            return
+
         knowledge = Knowledge(
             vector_db=ChromaDb(
                 collection="vectors",
                 path="tmp/chromadb",
                 persistent_client=True,
-                embedder=HuggingfaceCustomEmbedder(api_key=self.GEMINI_API_KEY, id='sentence-transformers/all-MiniLM-L6-v2')
+                embedder=HuggingfaceCustomEmbedder(api_key=self.__get_hugging_face_key__(),id='sentence-transformers/all-MiniLM-L6-v2')
             ),
             contents_db = SqliteDb(db_file="tmp/my_knowledge.db")
         )
@@ -63,6 +83,16 @@ class UserAgent(Agent):
         self.knowledge = knowledge
         self.add_knowledge_to_context=True
         self.search_knowledge=True
+
+    def update_vector_embedder(self):
+
+        if not self.knowledge.vector_db:
+            return
+
+        self.knowledge.vector_db.embedder = HuggingfaceCustomEmbedder(
+            api_key=self.__get_hugging_face_key__(),
+            id='sentence-transformers/all-MiniLM-L6-v2'
+        )
 
     def add_knowledge(self, meet, pdf_path):
 
@@ -76,6 +106,18 @@ class UserAgent(Agent):
             reader=reader
         )
 
+    def run_prompt(self, prompt):
+        print(f'[INFO] Rodando prompt: {prompt}')
+        try:
+            response = self.run(f"{prompt}")
+            return str(response.content)
+        except ModelProviderError as e:
+            raise ModelProviderError('Oops, algo deu errado! Verifique as api_keys passadas para o agente.')
+        except Exception as e:
+            print(f"[ERRO] {e} -> tentando próximo modelo....")
+            self.switch_model()
+            return self.run_prompt(prompt)
+
     def __document_exists__(self, name: str) -> bool:
         collection = self.knowledge.vector_db.client.get_collection("vectors")
 
@@ -88,12 +130,8 @@ class UserAgent(Agent):
 
         return len(result["ids"][0]) > 0
 
-    def run_prompt(self, prompt):
-        print(f'[INFO] Rodando prompt: {prompt}')
-        try:
-            response = self.run(f"{prompt}")
-            return str(response.content)
-        except Exception as e:
-            print(f"[ERRO] {e} -> tentando próximo modelo...")
-            self.switch_model()
-            return self.run_prompt(prompt)
+    def __get_groq_key__(self):
+        return st.session_state.get('groq_key')
+
+    def __get_hugging_face_key__(self):
+        return st.session_state.get('hugging_face_key')

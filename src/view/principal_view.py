@@ -6,11 +6,9 @@ import asyncio
 
 class PrincipalView:
 
-    def __init__(self, extractor, agent, title, content):
+    def __init__(self, extractor, agent):
         self.extractor = extractor
         self.agent = agent
-        self.title = title
-        self.content = content
         self.config = Config()
 
     def run(self):
@@ -25,12 +23,12 @@ class PrincipalView:
         st.sidebar.divider()
 
         groq = st.sidebar.text_input('GROQ API')
-        gemini = st.sidebar.text_input('GEMINI API')
+        hugging_face = st.sidebar.text_input('HUGGING FACE API')
 
-        self.agent.GROQ_API_KEY = groq
-        self.agent.GEMINI_API_KEY = gemini
+        st.session_state['groq_key'] = groq
+        st.session_state['hugging_face_key'] = hugging_face
 
-        self.agent.create_knowledge()
+        self.agent.update_vector_embedder()
 
     def __principal__(self):
 
@@ -50,8 +48,12 @@ class PrincipalView:
 
         if prompt:
             container.chat_message(name='user').write(prompt)
-            result = self.agent.run_prompt(prompt)
-            container.chat_message(name='ai').write(result)
+
+            try:
+                result = self.agent.run_prompt(prompt)
+                container.chat_message(name='ai').write(result)
+            except Exception as e:
+                container.chat_message(name='ai').write(e.message)
 
     def __get_last_copom_name__(self) -> str:
 

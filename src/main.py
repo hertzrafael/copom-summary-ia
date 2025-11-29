@@ -10,13 +10,10 @@ async def main():
     extractor = Extractor()
     agent = UserAgent()
 
-    title, content = await get_or_request_pdf(extractor)
+    await get_or_request_pdf(extractor)
 
     st.title('Sumário COPOM')
-    PrincipalView(extractor, agent, title, content).run()
-
-    #print(title)
-    #print(content)
+    PrincipalView(extractor, agent).run()
 
 
 if __name__ == '__main__':
