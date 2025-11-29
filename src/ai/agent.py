@@ -86,7 +86,7 @@ class UserAgent(Agent):
 
     def update_vector_embedder(self):
 
-        if not self.knowledge.vector_db:
+        if not self.knowledge or not self.knowledge.vector_db:
             return
 
         self.knowledge.vector_db.embedder = HuggingfaceCustomEmbedder(

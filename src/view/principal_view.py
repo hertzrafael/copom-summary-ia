@@ -11,6 +11,9 @@ class PrincipalView:
         self.agent = agent
         self.config = Config()
 
+        if 'messages' not in st.session_state:
+            st.session_state.messages = []
+
     def run(self):
         self.__sidebar__()
         self.__principal__()
@@ -43,17 +46,20 @@ class PrincipalView:
         """)
 
 
-        #st.chat_message(name='ai')
-        prompt = st.chat_input(placeholder='Insira aqui sua mensagem', max_chars=300)
+        for message in st.session_state.get('messages'):
+            container.chat_message(name=message['name']).write(message['message'])
 
+        prompt = st.chat_input(placeholder='Insira aqui sua mensagem', max_chars=300)
         if prompt:
-            container.chat_message(name='user').write(prompt)
+            self.__insert_message__(container, 'user', prompt)
 
             try:
                 result = self.agent.run_prompt(prompt)
-                container.chat_message(name='ai').write(result)
+                ai_response = result
             except Exception as e:
-                container.chat_message(name='ai').write(e.message)
+                ai_response = e.message
+
+            self.__insert_message__(container, 'ai', ai_response)
 
     def __get_last_copom_name__(self) -> str:
 
@@ -70,3 +76,7 @@ class PrincipalView:
         self.pdf_path = pdf_path
 
         self.agent.add_knowledge(title.split()[0].replace('ª', ''), pdf_path)
+
+    def __insert_message__(self, container, name, message):
+        st.session_state.messages.append({'name': name, 'message': message})
+        container.chat_message(name=name).write(message)
