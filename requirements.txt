@@ -5,3 +5,6 @@ requests
 beautifulsoup4
 pypdf
 asyncio
+huggingface-hub
+chromadb
+sqlalchemy

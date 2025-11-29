@@ -6,8 +6,9 @@ import asyncio
 
 class PrincipalView:
 
-    def __init__(self, extractor, title, content):
+    def __init__(self, extractor, agent, title, content):
         self.extractor = extractor
+        self.agent = agent
         self.title = title
         self.content = content
         self.config = Config()
@@ -21,6 +22,15 @@ class PrincipalView:
         st.sidebar.subheader(f'{self.__get_last_copom_name__()}')
 
         st.sidebar.button('Atualizar COPOM', type='primary', use_container_width=True, on_click=self.__update_copom__)
+        st.sidebar.divider()
+
+        groq = st.sidebar.text_input('GROQ API')
+        gemini = st.sidebar.text_input('GEMINI API')
+
+        self.agent.GROQ_API_KEY = groq
+        self.agent.GEMINI_API_KEY = gemini
+
+        self.agent.create_knowledge()
 
     def __principal__(self):
 
@@ -36,8 +46,12 @@ class PrincipalView:
 
 
         #st.chat_message(name='ai')
-        prompt = st.chat_input(placeholder='Insira aqui sua mensagem')
-        
+        prompt = st.chat_input(placeholder='Insira aqui sua mensagem', max_chars=300)
+
+        if prompt:
+            container.chat_message(name='user').write(prompt)
+            result = self.agent.run_prompt(prompt)
+            container.chat_message(name='ai').write(result)
 
     def __get_last_copom_name__(self) -> str:
 
@@ -48,7 +62,9 @@ class PrincipalView:
             return 'Nenhum'
 
     def __update_copom__(self):
-        title, content = asyncio.run(self.extractor.init())
+        title, pdf_path = asyncio.run(self.extractor.init())
 
         self.title = title
-        self.content = content
+        self.pdf_path = pdf_path
+
+        self.agent.add_knowledge(title.split()[0].replace('ª', ''), pdf_path)
